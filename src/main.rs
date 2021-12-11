@@ -61,6 +61,7 @@ fn rocket() -> _ {
                 delete_success_page,
                 error_page,
                 create_owner,
+                restock_order_page,
             ],
         )
         .mount("/style", FileServer::from("style/"))

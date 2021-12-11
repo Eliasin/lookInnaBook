@@ -1,0 +1,37 @@
+{% extends "base" %}
+
+{% block head %}
+<link rel="stylesheet" href="/style/restock_orders.css" />
+{% endblock head %}
+
+{% block restock_orders_nav %}
+{% endblock restock_orders_nav %}
+
+{% block error %}
+<div id="error-banner">
+</div>
+{% endblock error %}
+
+{% block content %}
+
+{% if num_orders > 0 %}
+<h1>Restock Orders</h1>
+<div class="orders">
+{% for order in orders %}
+<div class="order">
+    <h4>{{ order.order_date }}</h4>
+    </a>
+    <p>ISBN: {{ order.isbn }}</p>
+    <p>Quantity: {{ order.quantity }}</p>
+    <p>Price Per Unit: {{ order.price_per_unit }}</p>
+    <p>Order Status: {{ order.order_status }}</p>
+    <p>
+</div>
+{% endfor %}
+</div>
+{% else %}
+<h1>No Orders</h1>
+<button onclick="window.location.replace(window.location.origin)">Go Back!</button>
+{% endif %}
+
+{% endblock content %}

@@ -1122,4 +1122,15 @@ pub mod query {
             .count()
             > 0)
     }
+
+    pub async fn get_restock_orders(
+        conn: &DbConn,
+    ) -> Result<Vec<RestockOrder>, postgres::error::Error> {
+        Ok(conn
+            .run(|c| c.query("SELECT * FROM base.restock_order;", &[]))
+            .await?
+            .iter()
+            .map(|row| RestockOrder::from_row(row).unwrap())
+            .collect())
+    }
 }

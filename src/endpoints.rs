@@ -8,9 +8,9 @@ use crate::db::query::{
     delete_owner_account, discontinue_books, get_books, get_books_for_order,
     get_books_with_publisher_name, get_customer_accounts, get_customer_cart, get_customer_info,
     get_customer_orders_info, get_order_info, get_owner_accounts, get_publishers,
-    get_sales_by_date, get_sales_by_publisher, try_create_new_customer, try_create_new_owner,
-    try_create_publisher, undiscontinue_books, validate_customer_login, validate_owner_login,
-    Expiry, OwnerLoginType,
+    get_restock_orders, get_sales_by_date, get_sales_by_publisher, try_create_new_customer,
+    try_create_new_owner, try_create_publisher, undiscontinue_books, validate_customer_login,
+    validate_owner_login, Expiry, OwnerLoginType,
 };
 use crate::request_guards::state::SessionType;
 use crate::schema::entities::{Book, BookWithPublisherName, PostgresInt, ISBN};
@@ -1170,5 +1170,22 @@ pub async fn create_owner(conn: DbConn, owner_data: Form<RegisterOwner<'_>>) -> 
     match try_create_new_owner(&conn, email, password, name).await {
         Ok(_) => Redirect::to("/"),
         Err(e) => Redirect::to(uri!(register_failed(format!("{:?}", e)))),
+    }
+}
+
+#[get("/owner/restock/view")]
+pub async fn restock_order_page(conn: DbConn, owner: Owner) -> Template {
+    let mut context = Context::new();
+
+    add_owner_tag(&Some(owner), &mut context);
+
+    match get_restock_orders(&conn).await {
+        Ok(restock_orders) => {
+            context.insert("num_orders", &restock_orders.len());
+            context.insert("orders", &restock_orders);
+
+            Template::render("restock_orders", context.into_json())
+        }
+        Err(e) => render_error_template(e.to_string(), &conn, &None).await,
     }
 }

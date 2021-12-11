@@ -404,8 +404,8 @@ COPY base.book (isbn, author_name, genre, publisher_id, num_pages, price, author
 82381902	B. Kenny	Sci-Fi	2	300	29.99	0.10	10	Jarjar Journeys	29	f
 312321	John Shefman	Cooking	4	25	50.00	0.10	5	Food For People Who Eat	7	f
 82381967	B. Kenny	Sci-Fi	2	300	29.99	0.10	10	Jarjar Journeys 2	24	f
-82381990	B. Kenny	Sci-Fi	2	300	29.99	0.10	10	Jarjar Journeys 3: Jarjar Redux Complete	28	f
 7318293	Ian Stoop	Self-Improvement	3	3	99.00	0.50	2	How to Not be a Loser (For Losers)	5	f
+82381990	B. Kenny	Sci-Fi	2	300	29.99	0.10	10	Jarjar Journeys 3: Jarjar Redux Complete	2	f
 \.
 
 
@@ -457,6 +457,8 @@ COPY base.in_order (isbn, order_id, quantity) FROM stdin;
 82381990	9	1
 82381967	10	4
 312321	11	3
+82381990	12	25
+82381990	13	25
 \.
 
 
@@ -475,6 +477,8 @@ COPY base.orders (order_id, customer_id, shipping_address_id, tracking_number, o
 9	3	10	1910357174	PR	2021-12-09	3
 10	3	10	2235082141	PR	2021-12-09	3
 11	3	10	953908047	PR	2021-12-10	3
+12	3	10	2875238962	PR	2021-12-11	3
+13	3	10	2333627138	PR	2021-12-11	3
 \.
 
 
@@ -518,6 +522,7 @@ COPY base.publisher (publisher_id, company_name, phone_number, bank_number, addr
 --
 
 COPY base.restock_order (restock_order_id, isbn, quantity, price_per_unit, order_date, order_status) FROM stdin;
+2	82381990	53	$20.99	2021-12-11	PENDING
 \.
 
 
@@ -546,7 +551,7 @@ SELECT pg_catalog.setval('base.customer_customer_id_seq', 7, true);
 -- Name: orders_order_id_seq; Type: SEQUENCE SET; Schema: base; Owner: steven
 --
 
-SELECT pg_catalog.setval('base.orders_order_id_seq', 11, true);
+SELECT pg_catalog.setval('base.orders_order_id_seq', 13, true);
 
 
 --
@@ -574,7 +579,7 @@ SELECT pg_catalog.setval('base.publisher_publisher_id_seq', 4, true);
 -- Name: restock_order_restock_order_id_seq; Type: SEQUENCE SET; Schema: base; Owner: steven
 --
 
-SELECT pg_catalog.setval('base.restock_order_restock_order_id_seq', 1, false);
+SELECT pg_catalog.setval('base.restock_order_restock_order_id_seq', 2, true);
 
 
 --
@@ -674,10 +679,10 @@ ALTER TABLE ONLY base.restock_order
 
 
 --
--- Name: book book_restock; Type: TRIGGER; Schema: base; Owner: steven
+-- Name: book restock_books; Type: TRIGGER; Schema: base; Owner: steven
 --
 
-CREATE TRIGGER book_restock AFTER UPDATE ON base.book FOR EACH ROW EXECUTE FUNCTION public.restock_book_trigger();
+CREATE TRIGGER restock_books AFTER UPDATE ON base.book FOR EACH ROW EXECUTE FUNCTION public.restock_book_trigger();
 
 
 --

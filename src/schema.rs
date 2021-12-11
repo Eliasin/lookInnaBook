@@ -1,5 +1,7 @@
 pub mod entities {
+    use chrono::NaiveDate;
     use rocket::serde::Serialize;
+    use rust_decimal::Decimal;
 
     pub type PostgresInt = i32;
     pub type PostgresNumeric = rust_decimal::Decimal;
@@ -196,6 +198,30 @@ pub mod entities {
         pub email: String,
         pub default_shipping_address_id: PostgresInt,
         pub default_payment_info_id: PostgresInt,
+    }
+
+    #[derive(Serialize, Clone, Debug)]
+    pub struct RestockOrder {
+        pub restock_order_id: PostgresInt,
+        pub isbn: ISBN,
+        pub quantity: PostgresInt,
+        pub price_per_unit: Decimal,
+        pub order_date: String,
+        pub order_status: String,
+    }
+
+    impl RestockOrder {
+        pub fn from_row(row: &postgres::Row) -> Result<RestockOrder, postgres::error::Error> {
+            let order_date: NaiveDate = row.try_get("order_date")?;
+            Ok(RestockOrder {
+                restock_order_id: row.try_get("restock_order_id")?,
+                isbn: row.try_get("isbn")?,
+                quantity: row.try_get("quantity")?,
+                price_per_unit: row.try_get("price_per_unit")?,
+                order_date: order_date.to_string(),
+                order_status: row.try_get("order_status")?,
+            })
+        }
     }
 }
 

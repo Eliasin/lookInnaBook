@@ -1,0 +1,25 @@
+@import "header.css";
+
+#content {
+    text-align: center;
+}
+
+.orders {
+    display: flex;
+    flex-flow: column;
+    width: 25%;
+    margin: auto;
+}
+
+.order {
+    display: flex;
+    flex-flow: column;
+    align-items: center;
+    padding: 1%;
+    border: solid;
+    margin: 1%;
+}
+
+h1 {
+    text-align: center;
+}
