@@ -211,8 +211,7 @@ CREATE TABLE base.owner (
     owner_id integer NOT NULL,
     name character varying(20),
     email character varying(30),
-    password_hash character(60),
-    password_salt bytea
+    password_hash character(60)
 );
 
 
@@ -386,6 +385,14 @@ COPY base.address (address_id, street_address, postal_code, province) FROM stdin
 11	12831 W	1231	IW
 12	732 Main St	K192W9	ON
 13	829 Recipe Avenue	FOOD	ON
+14	27 Longwood Ave	K2314	ON
+15	82 LL	K2I980	ON
+16	88	1231	ON
+17	31	hkhh12	ON
+18	88	1231	ON
+19	31	hkhh12	ON
+20	88	1231	ON
+21	31	hkhh12	ON
 \.
 
 
@@ -395,9 +402,10 @@ COPY base.address (address_id, street_address, postal_code, province) FROM stdin
 
 COPY base.book (isbn, author_name, genre, publisher_id, num_pages, price, author_royalties, reorder_threshold, title, stock, discontinued) FROM stdin;
 82381902	B. Kenny	Sci-Fi	2	300	29.99	0.10	10	Jarjar Journeys	29	f
-82381967	B. BKenny	Sci-Fi	2	300	29.99	0.10	10	Jarjar Journeys 2	24	f
-82381990	B. BKenny	Sci-Fi	2	300	29.99	0.10	10	Jarjar Journeys 3: Jarjar Redux Complete	28	f
 312321	John Shefman	Cooking	4	25	50.00	0.10	5	Food For People Who Eat	7	f
+82381967	B. Kenny	Sci-Fi	2	300	29.99	0.10	10	Jarjar Journeys 2	24	f
+82381990	B. Kenny	Sci-Fi	2	300	29.99	0.10	10	Jarjar Journeys 3: Jarjar Redux Complete	28	f
+7318293	Ian Stoop	Self-Improvement	3	3	99.00	0.50	2	How to Not be a Loser (For Losers)	5	f
 \.
 
 
@@ -414,7 +422,6 @@ COPY base.book_collection (collection_id, curator_owner_id) FROM stdin;
 --
 
 COPY base.customer (customer_id, name, email, password_hash, default_shipping_address, default_payment_info_id) FROM stdin;
-2	Steve	test@local	$2b$10$BXeln024yC2PhT3J9jpuL.OYB9ciEUm0Lgvt3pDpTY0GlICWJGO4q	8	2
 3	Steve	test2@local	$2b$10$27lLyoOAxeJBQlGbh0ZL0eFZ80VwquejFQD1ecygB3dbsTkokb9sS	10	3
 \.
 
@@ -475,7 +482,8 @@ COPY base.orders (order_id, customer_id, shipping_address_id, tracking_number, o
 -- Data for Name: owner; Type: TABLE DATA; Schema: base; Owner: steven
 --
 
-COPY base.owner (owner_id, name, email, password_hash, password_salt) FROM stdin;
+COPY base.owner (owner_id, name, email, password_hash) FROM stdin;
+1	Stevee	admin2@local	$2b$10$vrJ5L21m1DVTsRf9Q2Uw/.o/z2UVL4.HivQ51FxnySt8waKyuzKdu
 \.
 
 
@@ -487,6 +495,10 @@ COPY base.payment_info (payment_info_id, name_on_card, expiry, card_number, cvv,
 1	Steven Pham	1/23	12312313	199	7
 2	Steven Pham	1/23	12312313	199	9
 3	Steven Pham	1/23	12312313	199	11
+4	Aaron	2/22	32131299	832	15
+5	Tyler	1/22	1231283	345	17
+6	Tyler	1/22	1231283	345	19
+7	Tyler	1/22	1231283	345	21
 \.
 
 
@@ -513,7 +525,7 @@ COPY base.restock_order (restock_order_id, isbn, quantity, price_per_unit, order
 -- Name: address_address_id_seq; Type: SEQUENCE SET; Schema: base; Owner: steven
 --
 
-SELECT pg_catalog.setval('base.address_address_id_seq', 13, true);
+SELECT pg_catalog.setval('base.address_address_id_seq', 21, true);
 
 
 --
@@ -527,7 +539,7 @@ SELECT pg_catalog.setval('base.book_collection_collection_id_seq', 1, false);
 -- Name: customer_customer_id_seq; Type: SEQUENCE SET; Schema: base; Owner: steven
 --
 
-SELECT pg_catalog.setval('base.customer_customer_id_seq', 3, true);
+SELECT pg_catalog.setval('base.customer_customer_id_seq', 7, true);
 
 
 --
@@ -541,14 +553,14 @@ SELECT pg_catalog.setval('base.orders_order_id_seq', 11, true);
 -- Name: owner_owner_id_seq; Type: SEQUENCE SET; Schema: base; Owner: steven
 --
 
-SELECT pg_catalog.setval('base.owner_owner_id_seq', 1, false);
+SELECT pg_catalog.setval('base.owner_owner_id_seq', 1, true);
 
 
 --
 -- Name: payment_info_payment_info_id_seq; Type: SEQUENCE SET; Schema: base; Owner: steven
 --
 
-SELECT pg_catalog.setval('base.payment_info_payment_info_id_seq', 3, true);
+SELECT pg_catalog.setval('base.payment_info_payment_info_id_seq', 7, true);
 
 
 --
@@ -659,6 +671,13 @@ ALTER TABLE ONLY base.publisher
 
 ALTER TABLE ONLY base.restock_order
     ADD CONSTRAINT restock_order_pkey PRIMARY KEY (restock_order_id);
+
+
+--
+-- Name: book book_restock; Type: TRIGGER; Schema: base; Owner: steven
+--
+
+CREATE TRIGGER book_restock AFTER UPDATE ON base.book FOR EACH ROW EXECUTE FUNCTION public.restock_book_trigger();
 
 
 --
