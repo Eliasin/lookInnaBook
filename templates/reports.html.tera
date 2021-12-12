@@ -9,6 +9,7 @@
 
 {% block content %}
 
-<img src="/owner/reports/sales"></img>
+<img src="/owner/reports/sales/publishers"></img>
+<img src="/owner/reports/sales/authors"></img>
 
 {% endblock content %}

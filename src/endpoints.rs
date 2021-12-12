@@ -8,9 +8,9 @@ use crate::db::query::{
     delete_owner_account, discontinue_books, get_books, get_books_for_order,
     get_books_with_publisher_name, get_customer_accounts, get_customer_cart, get_customer_info,
     get_customer_orders_info, get_order_info, get_owner_accounts, get_publishers,
-    get_restock_orders, get_sales_by_date, get_sales_by_publisher, try_create_new_customer,
-    try_create_new_owner, try_create_publisher, undiscontinue_books, validate_customer_login,
-    validate_owner_login, Expiry, OwnerLoginType,
+    get_restock_orders, get_sales_by_author, get_sales_by_date, get_sales_by_publisher,
+    get_top_authors_by_sales, try_create_new_customer, try_create_new_owner, try_create_publisher,
+    undiscontinue_books, validate_customer_login, validate_owner_login, Expiry, OwnerLoginType,
 };
 use crate::request_guards::state::SessionType;
 use crate::schema::entities::{Book, BookWithPublisherName, PostgresInt, ISBN};
@@ -868,13 +868,17 @@ pub async fn reports_page(owner: Owner) -> Template {
     Template::render("reports", context.into_json())
 }
 
-#[get("/owner/reports/sales")]
-pub async fn sales_report_image(conn: DbConn, _owner: Owner) -> (ContentType, String) {
-    let sales_by_date = get_sales_by_date(&conn).await.unwrap();
+type SalesPerDay = Vec<(NaiveDate, i64)>;
+
+fn plot_labeled_sales_data<T: AsRef<str>>(
+    title: T,
+    labeled_data: Vec<(String, SalesPerDay)>,
+) -> String {
+    type ProcessedSalesPerDay = Vec<(i128, i128)>;
 
     let today = Local::today().naive_local();
     // Converts the date indexing to days since today
-    let map_sales = |sales: Vec<(NaiveDate, i64)>| {
+    let map_sales = |sales: SalesPerDay| {
         let mapped_sales: Vec<(i128, i128)> = sales
             .into_iter()
             .map(|(date, quantity)| {
@@ -888,30 +892,19 @@ pub async fn sales_report_image(conn: DbConn, _owner: Owner) -> (ContentType, St
         mapped_sales
     };
 
-    let total_sales: Vec<(i128, i128)> = map_sales(sales_by_date);
-    let publishers = match get_publishers(&conn).await {
-        Ok(v) => v,
-        Err(_) => vec![],
-    };
+    let mut labeled_data: Vec<(String, ProcessedSalesPerDay)> = labeled_data
+        .into_iter()
+        .map(|(name, sales_per_day)| (name, map_sales(sales_per_day)))
+        .collect();
 
-    let mut sales_data: Vec<(String, Vec<(i128, i128)>)> =
-        vec![("Total Sales".to_string(), total_sales)];
-
-    for publisher in publishers {
-        let sales = get_sales_by_publisher(&conn, publisher.publisher_id).await;
-        if let Ok(sales) = sales {
-            sales_data.push((publisher.company_name.clone(), map_sales(sales)));
-        }
-    }
-
-    let days_included = sales_data
+    let days_included: HashSet<i128> = labeled_data
         .iter()
         .map(|(_, data)| data.iter().map(|(day, _)| *day))
         .flatten()
-        .collect::<HashSet<i128>>();
+        .collect();
 
     // Add missing dates as 0 data points
-    for (_, data) in &mut sales_data {
+    for (_, data) in &mut labeled_data {
         let days: Vec<i128> = data.iter().map(|(day, _)| *day).collect();
         for day in &days_included {
             if !days.contains(*day) {
@@ -920,15 +913,15 @@ pub async fn sales_report_image(conn: DbConn, _owner: Owner) -> (ContentType, St
         }
     }
 
-    let earliest_day = *sales_data
+    let earliest_day = labeled_data
         .iter()
         .map(|(_, data)| data)
         .flatten()
-        .map(|(days_since_today, _)| days_since_today)
+        .map(|(days_since_today, _)| *days_since_today)
         .min()
-        .unwrap_or(&0);
+        .unwrap_or(0);
 
-    let mut sales_data_as_days_since_earliest: Vec<(String, Vec<(i128, i128)>)> = sales_data
+    let mut sales_data_as_days_since_earliest: Vec<(String, Vec<(i128, i128)>)> = labeled_data
         .into_iter()
         .map(|(name, data)| {
             (
@@ -944,7 +937,7 @@ pub async fn sales_report_image(conn: DbConn, _owner: Owner) -> (ContentType, St
         data.sort_by(|(x0, _), (x1, _)| x0.cmp(x1));
     }
 
-    let mut s = poloto::plot("Book Sales", "Date", "Sales (1 Book)");
+    let mut s = poloto::plot(title.as_ref(), "Date", "Sales (1 Book)");
 
     s.ymarker(-1);
 
@@ -965,7 +958,57 @@ pub async fn sales_report_image(conn: DbConn, _owner: Owner) -> (ContentType, St
 
     let svg = poloto::disp(|a| poloto::simple_theme(a, s)).to_string();
 
-    (ContentType::SVG, svg)
+    svg
+}
+
+#[get("/owner/reports/sales/publishers")]
+pub async fn sales_report_image_publishers(conn: DbConn, _owner: Owner) -> (ContentType, String) {
+    let sales_by_date = get_sales_by_date(&conn).await.unwrap();
+
+    let publishers = match get_publishers(&conn).await {
+        Ok(v) => v,
+        Err(_) => vec![],
+    };
+
+    let mut sales_data: Vec<(String, SalesPerDay)> =
+        vec![("Total Sales".to_string(), sales_by_date)];
+
+    for publisher in publishers {
+        let sales = get_sales_by_publisher(&conn, publisher.publisher_id).await;
+        if let Ok(sales) = sales {
+            sales_data.push((publisher.company_name.clone(), sales));
+        }
+    }
+
+    (
+        ContentType::SVG,
+        plot_labeled_sales_data("Book Sales By Publisher", sales_data),
+    )
+}
+
+#[get("/owner/reports/sales/authors")]
+pub async fn sales_report_image_authors(conn: DbConn, _owner: Owner) -> (ContentType, String) {
+    let sales_by_date = get_sales_by_date(&conn).await.unwrap();
+
+    let authors = match get_top_authors_by_sales(&conn).await {
+        Ok(v) => v,
+        Err(_) => vec![],
+    };
+
+    let mut sales_data: Vec<(String, SalesPerDay)> =
+        vec![("Total Sales".to_string(), sales_by_date)];
+
+    for author in authors {
+        let sales = get_sales_by_author(&conn, author.clone()).await;
+        if let Ok(sales) = sales {
+            sales_data.push((author, sales));
+        }
+    }
+
+    (
+        ContentType::SVG,
+        plot_labeled_sales_data("Book Sales By Author", sales_data),
+    )
 }
 
 #[get("/owner/create/book")]
