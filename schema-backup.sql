@@ -268,11 +268,11 @@ ALTER TABLE base.payment_info ALTER COLUMN payment_info_id ADD GENERATED ALWAYS 
 
 CREATE TABLE base.publisher (
     publisher_id integer NOT NULL,
-    company_name character varying(20),
+    company_name character varying(50),
     phone_number character varying(20),
     bank_number character varying(20),
     address_id integer,
-    email character varying(30)
+    email character varying(50)
 );
 
 
@@ -611,6 +611,14 @@ ALTER TABLE ONLY base.book
 
 
 --
+-- Name: customer cust_email_unique; Type: CONSTRAINT; Schema: base; Owner: steven
+--
+
+ALTER TABLE ONLY base.customer
+    ADD CONSTRAINT cust_email_unique UNIQUE (email);
+
+
+--
 -- Name: customer customer_pkey; Type: CONSTRAINT; Schema: base; Owner: steven
 --
 
@@ -664,6 +672,14 @@ ALTER TABLE ONLY base.owner
 
 ALTER TABLE ONLY base.payment_info
     ADD CONSTRAINT payment_info_pkey PRIMARY KEY (payment_info_id);
+
+
+--
+-- Name: publisher pub_email_unique; Type: CONSTRAINT; Schema: base; Owner: steven
+--
+
+ALTER TABLE ONLY base.publisher
+    ADD CONSTRAINT pub_email_unique UNIQUE (email);
 
 
 --
