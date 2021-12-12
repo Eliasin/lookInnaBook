@@ -659,6 +659,14 @@ ALTER TABLE ONLY base.orders
 
 
 --
+-- Name: owner owner_email_unique; Type: CONSTRAINT; Schema: base; Owner: steven
+--
+
+ALTER TABLE ONLY base.owner
+    ADD CONSTRAINT owner_email_unique UNIQUE (email);
+
+
+--
 -- Name: owner owner_pkey; Type: CONSTRAINT; Schema: base; Owner: steven
 --
 

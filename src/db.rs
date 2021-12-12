@@ -79,6 +79,8 @@ pub mod error {
         DBError(#[from] postgres::error::Error),
         #[error("Internal bcrypt error")]
         BCryptError(#[from] bcrypt::BcryptError),
+        #[error("Email already exists")]
+        EmailAlreadyExistsError,
     }
 }
 
@@ -246,6 +248,7 @@ pub mod query {
 
         let email_o = email.clone();
         let email_c = email.clone();
+        let email_p = email.clone();
         let owner_email_exists = conn
             .run(move |c| c.query_opt("SELECT * FROM base.owner WHERE email = $1", &[&email_o]))
             .await?
@@ -261,6 +264,15 @@ pub mod query {
             .is_some();
 
         if customer_email_exists {
+            return Ok(true);
+        }
+
+        let publisher_email_exists = conn
+            .run(move |c| c.query_opt("SELECT * FROM base.publisher WHERE email = $1", &[&email_p]))
+            .await?
+            .is_some();
+
+        if publisher_email_exists {
             return Ok(true);
         }
 
@@ -310,7 +322,7 @@ pub mod query {
         let password = password.as_ref().to_string();
 
         if does_email_already_exist(&conn, email.as_str()).await? {
-            Err(CreateCustomerError::EmailAlreadyExistsError)?
+            Err(CreateOwnerError::EmailAlreadyExistsError)?
         }
 
         let password_hash = bcrypt::hash(password, 10)?;
@@ -1006,6 +1018,10 @@ pub mod query {
         let email = email.as_ref().to_owned();
         let phone_number = phone_number.as_ref().to_owned();
         let bank_number = bank_number.as_ref().to_owned();
+
+        if does_email_already_exist(&conn, email.as_str()).await? {
+            Err(CreatePublisherError::EmailAlreadyExistsError)?
+        }
 
         let address_id = get_or_insert_address(&conn, address).await?;
 
