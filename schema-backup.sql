@@ -84,7 +84,8 @@ ALTER TABLE base.book OWNER TO steven;
 
 CREATE TABLE base.book_collection (
     collection_id integer NOT NULL,
-    curator_owner_id integer
+    curator_owner_id integer,
+    name character varying(30)
 );
 
 
@@ -330,7 +331,7 @@ CREATE TABLE base.restock_order (
     restock_order_id integer NOT NULL,
     isbn integer,
     quantity integer,
-    price_per_unit money,
+    price_per_unit numeric(4,2),
     order_date date,
     order_status character varying(10)
 );
@@ -413,7 +414,9 @@ COPY base.book (isbn, author_name, genre, publisher_id, num_pages, price, author
 -- Data for Name: book_collection; Type: TABLE DATA; Schema: base; Owner: steven
 --
 
-COPY base.book_collection (collection_id, curator_owner_id) FROM stdin;
+COPY base.book_collection (collection_id, curator_owner_id, name) FROM stdin;
+1	1	JarJar Journeys
+2	1	Cooking
 \.
 
 
@@ -439,6 +442,7 @@ COPY base.in_cart (isbn, customer_id, quantity) FROM stdin;
 --
 
 COPY base.in_collection (collection_id, isbn) FROM stdin;
+2	312321
 \.
 
 
@@ -522,7 +526,7 @@ COPY base.publisher (publisher_id, company_name, phone_number, bank_number, addr
 --
 
 COPY base.restock_order (restock_order_id, isbn, quantity, price_per_unit, order_date, order_status) FROM stdin;
-2	82381990	53	$20.99	2021-12-11	PENDING
+2	82381990	53	20.99	2021-12-11	PENDING
 \.
 
 
@@ -537,7 +541,7 @@ SELECT pg_catalog.setval('base.address_address_id_seq', 21, true);
 -- Name: book_collection_collection_id_seq; Type: SEQUENCE SET; Schema: base; Owner: steven
 --
 
-SELECT pg_catalog.setval('base.book_collection_collection_id_seq', 1, false);
+SELECT pg_catalog.setval('base.book_collection_collection_id_seq', 2, true);
 
 
 --
