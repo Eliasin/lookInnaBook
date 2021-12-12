@@ -59,6 +59,8 @@ pub mod error {
     pub enum CreatePublisherError {
         #[error("Internal DB error: `{0}`")]
         DBError(#[from] postgres::error::Error),
+        #[error("Email already exists")]
+        EmailAlreadyExistsError,
     }
 
     #[derive(Debug, Error)]
@@ -67,6 +69,8 @@ pub mod error {
         DBError(#[from] postgres::error::Error),
         #[error("Internal bcrypt error")]
         BCryptError(#[from] bcrypt::BcryptError),
+        #[error("Email already exists")]
+        EmailAlreadyExistsError,
     }
 
     #[derive(Debug, Error)]
@@ -234,6 +238,35 @@ pub mod query {
         }).await?.get("payment_info_id"))
     }
 
+    pub async fn does_email_already_exist<T: AsRef<str>>(
+        conn: &DbConn,
+        email: T,
+    ) -> Result<bool, postgres::error::Error> {
+        let email = email.as_ref().to_owned();
+
+        let email_o = email.clone();
+        let email_c = email.clone();
+        let owner_email_exists = conn
+            .run(move |c| c.query_opt("SELECT * FROM base.owner WHERE email = $1", &[&email_o]))
+            .await?
+            .is_some();
+
+        if owner_email_exists {
+            return Ok(true);
+        }
+
+        let customer_email_exists = conn
+            .run(move |c| c.query_opt("SELECT * FROM base.customer WHERE email = $1", &[&email_c]))
+            .await?
+            .is_some();
+
+        if customer_email_exists {
+            return Ok(true);
+        }
+
+        Ok(false)
+    }
+
     pub async fn try_create_new_customer<'a, T: AsRef<str>>(
         conn: &DbConn,
         email: T,
@@ -245,6 +278,10 @@ pub mod query {
         let name = name.as_ref().to_string();
         let email = email.as_ref().to_string();
         let password = password.as_ref().to_string();
+
+        if does_email_already_exist(&conn, email.as_str()).await? {
+            Err(CreateCustomerError::EmailAlreadyExistsError)?
+        }
 
         let address_id = try_add_address(conn, address).await?;
         let payment_info_id = try_add_payment_info(conn, payment_info).await?;
@@ -271,6 +308,10 @@ pub mod query {
         let name = name.as_ref().to_string();
         let email = email.as_ref().to_string();
         let password = password.as_ref().to_string();
+
+        if does_email_already_exist(&conn, email.as_str()).await? {
+            Err(CreateCustomerError::EmailAlreadyExistsError)?
+        }
 
         let password_hash = bcrypt::hash(password, 10)?;
 

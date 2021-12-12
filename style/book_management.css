@@ -7,6 +7,7 @@ h1 {
 .books {
     display: flex;
     flex-flow: row;
+    flex-wrap: wrap;
 }
 
 .book {
