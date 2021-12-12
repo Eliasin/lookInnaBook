@@ -1030,6 +1030,25 @@ pub mod query {
             .collect())
     }
 
+    pub async fn get_sales_by_genre(
+        conn: &DbConn,
+        genre: String,
+    ) -> Result<Vec<(NaiveDate, i64)>, postgres::error::Error> {
+        let rows = conn
+            .run(move |c| c.query("SELECT order_date, sum(quantity) as quantity FROM base.raw_sales_data WHERE author_name = $1 GROUP BY (order_date);", &[&genre]))
+            .await?;
+
+        Ok(rows
+            .iter()
+            .flat_map(|row| {
+                let result: Result<(NaiveDate, i64), postgres::error::Error> =
+                    try { (row.try_get("order_date")?, row.try_get("quantity")?) };
+
+                result.ok()
+            })
+            .collect())
+    }
+
     pub async fn get_top_authors_by_sales(
         conn: &DbConn,
     ) -> Result<Vec<String>, postgres::error::Error> {
@@ -1039,6 +1058,17 @@ pub mod query {
         Ok(conn.run(|c| {
             c.query("SELECT author_name FROM base.raw_sales_data WHERE order_date > NOW() - interval '1 month' GROUP BY (author_name) ORDER BY sum(quantity) desc limit 10;", &[])
         }).await?.iter().flat_map(|row| row.try_get("author_name")).collect())
+    }
+
+    pub async fn get_top_genres_by_sales(
+        conn: &DbConn,
+    ) -> Result<Vec<String>, postgres::error::Error> {
+        // Top genres is a little nebulous because we do no necessarily want
+        // the top genre by absolute sales as recency is probably more important.
+        // Therefore, we only consider sales in the last month.
+        Ok(conn.run(|c| {
+            c.query("SELECT genre FROM base.raw_sales_data WHERE order_date > NOW() - interval '1 month' GROUP BY (genre) ORDER BY sum(quantity) desc limit 10;", &[])
+        }).await?.iter().flat_map(|row| row.try_get("genre")).collect())
     }
 
     pub async fn create_book(conn: &DbConn, book: Book) -> Result<(), postgres::error::Error> {

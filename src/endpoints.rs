@@ -8,9 +8,10 @@ use crate::db::query::{
     delete_owner_account, discontinue_books, get_books, get_books_for_order,
     get_books_with_publisher_name, get_customer_accounts, get_customer_cart, get_customer_info,
     get_customer_orders_info, get_order_info, get_owner_accounts, get_publishers,
-    get_restock_orders, get_sales_by_author, get_sales_by_date, get_sales_by_publisher,
-    get_top_authors_by_sales, try_create_new_customer, try_create_new_owner, try_create_publisher,
-    undiscontinue_books, validate_customer_login, validate_owner_login, Expiry, OwnerLoginType,
+    get_restock_orders, get_sales_by_author, get_sales_by_date, get_sales_by_genre,
+    get_sales_by_publisher, get_top_authors_by_sales, get_top_genres_by_sales,
+    try_create_new_customer, try_create_new_owner, try_create_publisher, undiscontinue_books,
+    validate_customer_login, validate_owner_login, Expiry, OwnerLoginType,
 };
 use crate::request_guards::state::SessionType;
 use crate::schema::entities::{Book, BookWithPublisherName, PostgresInt, ISBN};
@@ -1008,6 +1009,31 @@ pub async fn sales_report_image_authors(conn: DbConn, _owner: Owner) -> (Content
     (
         ContentType::SVG,
         plot_labeled_sales_data("Book Sales By Author", sales_data),
+    )
+}
+
+#[get("/owner/reports/sales/genre")]
+pub async fn sales_report_image_genre(conn: DbConn, _owner: Owner) -> (ContentType, String) {
+    let sales_by_date = get_sales_by_date(&conn).await.unwrap();
+
+    let genres = match get_top_genres_by_sales(&conn).await {
+        Ok(v) => v,
+        Err(_) => vec![],
+    };
+
+    let mut sales_data: Vec<(String, SalesPerDay)> =
+        vec![("Total Sales".to_string(), sales_by_date)];
+
+    for genre in genres {
+        let sales = get_sales_by_genre(&conn, genre.clone()).await;
+        if let Ok(sales) = sales {
+            sales_data.push((genre, sales));
+        }
+    }
+
+    (
+        ContentType::SVG,
+        plot_labeled_sales_data("Book Sales By Genre", sales_data),
     )
 }
 

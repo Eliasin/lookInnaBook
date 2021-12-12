@@ -11,5 +11,6 @@
 
 <img src="/owner/reports/sales/publishers"></img>
 <img src="/owner/reports/sales/authors"></img>
+<img src="/owner/reports/sales/genre"></img>
 
 {% endblock content %}
