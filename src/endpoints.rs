@@ -363,9 +363,16 @@ pub async fn register(conn: DbConn, register_data: Form<Register<'_>>) -> Redire
 }
 
 #[get("/book/<isbn>")]
-pub async fn book(conn: DbConn, isbn: &str, customer: Option<Customer>) -> Template {
+pub async fn book(
+    conn: DbConn,
+    isbn: &str,
+    customer: Option<Customer>,
+    owner: Option<Owner>,
+) -> Template {
     let mut context = Context::new();
     add_customer_info(&conn, &customer, &mut context).await;
+
+    add_owner_tag(&owner, &mut context);
 
     match isbn.parse::<i32>() {
         Ok(isbn) => {
@@ -472,6 +479,9 @@ pub async fn customer_cart_set_quantity(
         .await
         .map_err(|e| match e {
             CartError::NotEnoughStock => (Status::Conflict, "Insufficient book stock".to_owned()),
+            CartError::DiscontinuedBookError => {
+                (Status::Conflict, "Book is discontinued".to_owned())
+            }
             CartError::DBError(e) => (Status::InternalServerError, e.to_string()),
         })
 }

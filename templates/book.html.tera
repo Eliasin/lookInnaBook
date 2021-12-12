@@ -18,7 +18,7 @@
 <p>Price: {{ book.price }}</p>
 <p>Stock: {{ book.stock }}</p>
 
-{% if customer %}
+{% if customer and not book.discontinued %}
 <p><button onclick=
            "
             async function task() {

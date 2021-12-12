@@ -31,6 +31,8 @@ pub mod error {
     pub enum CartError {
         #[error("Insufficient stock for quantity change")]
         NotEnoughStock,
+        #[error("Discontinued book")]
+        DiscontinuedBookError,
         #[error("Internal DB error: `{0}`")]
         DBError(#[from] postgres::error::Error),
     }
@@ -39,6 +41,8 @@ pub mod error {
     pub enum OrderError {
         #[error("Insufficient stock for order")]
         NotEnoughStock,
+        #[error("Discontinued book")]
+        DiscontinuedBookError,
         #[error("Internal DB error: `{0}`")]
         DBError(#[from] postgres::error::Error),
         #[error("Internal state error: `{0}`")]
@@ -485,11 +489,30 @@ pub mod query {
             .collect())
     }
 
+    pub async fn is_book_discontinued(
+        conn: &DbConn,
+        isbn: ISBN,
+    ) -> Result<bool, postgres::error::Error> {
+        Ok(conn
+            .run(move |c| {
+                c.query_one(
+                    "SELECT discontinued FROM base.book WHERE isbn = $1;",
+                    &[&isbn],
+                )
+            })
+            .await?
+            .try_get("discontinued")?)
+    }
+
     pub async fn add_to_cart(
         conn: &DbConn,
         customer_id: PostgresInt,
         isbn: ISBN,
-    ) -> Result<(), postgres::error::Error> {
+    ) -> Result<(), CartError> {
+        if is_book_discontinued(conn, isbn).await? {
+            Err(CartError::DiscontinuedBookError)?
+        }
+
         let cart_row = conn
             .run(move |c| {
                 c.query_opt(
@@ -501,7 +524,7 @@ pub mod query {
 
         match cart_row {
             Some(_) => {
-                conn.run(move |c| c.execute("UPDATE base.in_cart SET quantity = quantity + 1 WHERE isbn = $1 AND customer_id = $2", &[&isbn, &customer_id]))
+                conn.run(move |c| c.execute("UPDATE base.in_cart SET quantity = quantity + 1 WHERE isbn = $1 AND customer_id = $2;", &[&isbn, &customer_id]))
                     .await?;
                 Ok(())
             }
@@ -776,6 +799,9 @@ pub mod query {
             let quantity = i32::max(*quantity, 0) as u32;
             if !check_enough_stock(conn, *isbn, quantity).await? {
                 Err(OrderError::NotEnoughStock)?;
+            }
+            if is_book_discontinued(conn, *isbn).await? {
+                Err(OrderError::DiscontinuedBookError)?
             }
         }
 
