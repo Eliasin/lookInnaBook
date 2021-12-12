@@ -476,7 +476,7 @@ pub mod query {
             .try_get("stock")?;
 
         let quantity = u32::max(quantity, 0) as i32;
-        Ok(quantity < stock)
+        Ok(quantity <= stock)
     }
 
     pub async fn cart_set_book_quantity(
