@@ -14,6 +14,9 @@
                         {% block home_nav %}
                         <a href="/">Home</a>
                         {% endblock home_nav %}
+                        {% block collections_nav %}
+                        <a href="/collections">Collections</a>
+                        {% endblock collections_nav %}
                     </div>
                     <div>
                         {% if customer %}
@@ -50,6 +53,9 @@
                             {% block manage_accounts_nav %}
                             <a href="/owner/manage/accounts">Manage Accounts</a>
                             {% endblock manage_accounts_nav %}
+                            {% block manage_collections_nav %}
+                            <a href="/owner/manage/collections">Manage Collections</a>
+                            {% endblock manage_collections_nav %}
                             {% block reports_nav %}
                             <a href="/owner/reports/">View Reports</a>
                             {% endblock reports_nav %}

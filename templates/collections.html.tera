@@ -1,0 +1,45 @@
+{% extends "base" %}
+
+{% block head %}
+<link rel="stylesheet" href="/style/collections.css" />
+{% endblock head %}
+
+{% if owner_logged_in %}
+{% block manage_collections_nav %}
+{% endblock manage_collections_nav %}
+{% else %}
+{% block collections_nav %}
+{% endblock collections_nav %}
+{% endif %}
+
+{% block content %}
+
+<form action="/owner/manage/collections/add" method="post">
+  <ul>
+    <li>
+        <label for="name">Name:</label>
+        <input type="name" id="name" name="name" required></input>
+    </li>
+    <li>
+      <button type="submit">Create Collection</button>
+    </li>
+  </ul>
+</form>
+
+{% if num_collections > 0 %}
+<div class="collections">
+{% for collection in collections %}
+<div class="collection">
+    <a href="/collection/{{ collection.collection_id }}/search">
+    <image src="/collection/{{ collection.collection_id }}/image" onerror="this.src = 'https://via.placeholder.com/180'"></image>
+    </a>
+    <h4>{{ collection.name }}</h4>
+    <p>Curator: {{ collection.curator_name }}</p>
+</div>
+{% endfor %}
+</div>
+{% else %}
+<h1>No Collections</h1>
+{% endif %}
+
+{% endblock content %}

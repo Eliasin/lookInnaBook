@@ -1193,4 +1193,233 @@ pub mod query {
             .map(|row| RestockOrder::from_row(row).unwrap())
             .collect())
     }
+
+    pub async fn add_collection<T: AsRef<str>>(
+        conn: &DbConn,
+        curator_id: PostgresInt,
+        name: T,
+    ) -> Result<PostgresInt, postgres::error::Error> {
+        let name = name.as_ref().to_owned();
+        let collection_id: PostgresInt = conn.run(move |c| {
+            c.query_one("INSERT INTO base.book_collection (curator_owner_id, name) VALUES ($1, $2) RETURNING collection_id;", &[&curator_id, &name])
+        }).await?.try_get("collection_id")?;
+
+        Ok(collection_id)
+    }
+
+    pub async fn add_books_to_collection(
+        conn: &DbConn,
+        collection_id: PostgresInt,
+        books: Vec<ISBN>,
+    ) -> Result<(), postgres::error::Error> {
+        for isbn in books {
+            conn.run(move |c| {
+                c.execute(
+                    "INSERT INTO base.in_collection (collection_id, isbn) VALUES ($1, $2)",
+                    &[&collection_id, &isbn],
+                )
+            })
+            .await?;
+        }
+
+        Ok(())
+    }
+
+    pub async fn remove_books_from_collection(
+        conn: &DbConn,
+        collection_id: PostgresInt,
+        books: Vec<ISBN>,
+    ) -> Result<(), postgres::error::Error> {
+        for isbn in books {
+            conn.run(move |c| {
+                c.execute(
+                    "DELETE FROM base.in_collection WHERE isbn = $1 AND collection_id = $2;",
+                    &[&isbn, &collection_id],
+                )
+            })
+            .await?;
+        }
+
+        Ok(())
+    }
+
+    pub async fn get_collection(
+        conn: &DbConn,
+        collection_id: PostgresInt,
+    ) -> Result<Collection, postgres::error::Error> {
+        struct PartialCollection {
+            collection_id: PostgresInt,
+            name: String,
+            curator_id: PostgresInt,
+            curator_name: String,
+        }
+
+        let row = conn
+            .run(move |c| {
+                c.query_one(
+                    "
+                    SELECT base.book_collection.name AS name,
+                    curator_owner_id, base.owner.name AS curator_name
+                    FROM base.book_collection INNER JOIN
+                    base.owner ON base.book_collection.curator_owner_id = base.owner.owner_id
+                    WHERE collection_id = $1",
+                    &[&collection_id],
+                )
+            })
+            .await?;
+
+        let partial_collection = PartialCollection {
+            collection_id,
+            name: row.try_get("name")?,
+            curator_id: row.try_get("curator_owner_id")?,
+            curator_name: row.try_get("curator_name")?,
+        };
+
+        let PartialCollection {
+            collection_id,
+            name,
+            curator_id,
+            curator_name,
+        } = partial_collection;
+        let books: Vec<Book> = conn.run(move |c| c.query("SELECT * FROM base.in_collection INNER JOIN base.book USING (isbn) WHERE collection_id = $1", &[&collection_id])).await?.iter().flat_map(Book::from_row).collect();
+
+        Ok(Collection {
+            collection_id,
+            name,
+            curator_id,
+            curator_name,
+            books,
+        })
+    }
+
+    pub async fn get_collections(conn: &DbConn) -> Result<Vec<Collection>, postgres::error::Error> {
+        struct PartialCollection {
+            collection_id: PostgresInt,
+            name: String,
+            curator_id: PostgresInt,
+            curator_name: String,
+        }
+
+        let partial_collections: Vec<PartialCollection> = conn
+            .run(move |c| {
+                c.query(
+                    "
+                    SELECT collection_id, base.book_collection.name AS name,
+                    curator_owner_id, base.owner.name AS curator_name
+                    FROM base.book_collection INNER JOIN
+                    base.owner ON base.book_collection.curator_owner_id = base.owner.owner_id;
+                    ",
+                    &[],
+                )
+            })
+            .await?
+            .iter()
+            .flat_map(|row| -> Result<PartialCollection, postgres::error::Error> {
+                Ok(PartialCollection {
+                    collection_id: row.try_get("collection_id")?,
+                    name: row.try_get("name")?,
+                    curator_id: row.try_get("curator_owner_id")?,
+                    curator_name: row.try_get("curator_name")?,
+                })
+            })
+            .collect();
+
+        let mut collections = vec![];
+
+        for partial_collection in partial_collections {
+            let PartialCollection {
+                collection_id,
+                name,
+                curator_id,
+                curator_name,
+            } = partial_collection;
+            let books: Vec<Book> = conn.run(move |c| c.query("SELECT * FROM base.in_collection INNER JOIN base.book USING (isbn) WHERE collection_id = $1", &[&collection_id])).await?.iter().flat_map(Book::from_row).collect();
+
+            collections.push(Collection {
+                collection_id,
+                name,
+                curator_id,
+                curator_name,
+                books,
+            });
+        }
+
+        Ok(collections)
+    }
+
+    pub async fn get_collections_curated_by_owner(
+        conn: &DbConn,
+        owner_id: PostgresInt,
+    ) -> Result<Vec<Collection>, postgres::error::Error> {
+        struct PartialCollection {
+            collection_id: PostgresInt,
+            name: String,
+            curator_id: PostgresInt,
+            curator_name: String,
+        }
+
+        let partial_collections: Vec<PartialCollection> = conn
+            .run(move |c| {
+                c.query(
+                    "
+                    SELECT collection_id, base.book_collection.name AS name,
+                    curator_owner_id, base.owner.name AS curator_name
+                    FROM base.book_collection INNER JOIN
+                    base.owner ON base.book_collection.curator_owner_id = base.owner.owner_id
+                    WHERE curator_owner_id = $1",
+                    &[&owner_id],
+                )
+            })
+            .await?
+            .iter()
+            .flat_map(|row| -> Result<PartialCollection, postgres::error::Error> {
+                Ok(PartialCollection {
+                    collection_id: row.try_get("collection_id")?,
+                    name: row.try_get("name")?,
+                    curator_id: row.try_get("curator_owner_id")?,
+                    curator_name: row.try_get("curator_name")?,
+                })
+            })
+            .collect();
+
+        let mut collections = vec![];
+
+        for partial_collection in partial_collections {
+            let PartialCollection {
+                collection_id,
+                name,
+                curator_id,
+                curator_name,
+            } = partial_collection;
+            let books: Vec<Book> = conn.run(move |c| c.query("SELECT * FROM base.in_collection INNER JOIN base.book USING (isbn) WHERE collection_id = $1", &[&collection_id])).await?.iter().flat_map(Book::from_row).collect();
+
+            collections.push(Collection {
+                collection_id,
+                name,
+                curator_id,
+                curator_name,
+                books,
+            });
+        }
+
+        Ok(collections)
+    }
+
+    pub async fn is_owner_curator(
+        conn: &DbConn,
+        owner_id: PostgresInt,
+        collection_id: PostgresInt,
+    ) -> Result<bool, postgres::error::Error> {
+        Ok(conn
+            .run(move |c| {
+                c.query_opt(
+                    "
+        SELECT * FROM base.book_collection WHERE collection_id = $1 AND
+        curator_owner_id = $2;",
+                    &[&collection_id, &owner_id],
+                )
+            })
+            .await?
+            .is_some())
+    }
 }

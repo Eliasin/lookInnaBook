@@ -1,0 +1,15 @@
+{% extends "base" %}
+
+{% block head %}
+    <link rel="stylesheet" href="/style/collection_create_success.css" />
+{% endblock head %}
+
+{% block content %}
+<h1>Collection Creation Success</h1>
+<div class="message">
+    Collection has been successfully deleted.
+</div>
+<div class="home-container">
+<button onclick="window.location.replace(window.location.origin + '/owner/manage/collections')">Go Back</button>
+</div>
+{% endblock content %}

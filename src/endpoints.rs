@@ -4,14 +4,16 @@ use std::collections::{HashMap, HashSet};
 use crate::db::conn::DbConn;
 use crate::db::error::{CartError, OrderError, StateError};
 use crate::db::query::{
-    add_to_cart, cart_set_book_quantity, create_book, delete_customer_account,
-    delete_owner_account, discontinue_books, get_books, get_books_for_order,
-    get_books_with_publisher_name, get_customer_accounts, get_customer_cart, get_customer_info,
+    add_books_to_collection, add_collection, add_to_cart, cart_set_book_quantity, create_book,
+    delete_customer_account, delete_owner_account, discontinue_books, get_books,
+    get_books_for_order, get_books_with_publisher_name, get_collection, get_collections,
+    get_collections_curated_by_owner, get_customer_accounts, get_customer_cart, get_customer_info,
     get_customer_orders_info, get_order_info, get_owner_accounts, get_publishers,
     get_restock_orders, get_sales_by_author, get_sales_by_date, get_sales_by_genre,
-    get_sales_by_publisher, get_top_authors_by_sales, get_top_genres_by_sales,
-    try_create_new_customer, try_create_new_owner, try_create_publisher, undiscontinue_books,
-    validate_customer_login, validate_owner_login, Expiry, OwnerLoginType,
+    get_sales_by_publisher, get_top_authors_by_sales, get_top_genres_by_sales, is_owner_curator,
+    remove_books_from_collection, try_create_new_customer, try_create_new_owner,
+    try_create_publisher, undiscontinue_books, validate_customer_login, validate_owner_login,
+    Expiry, OwnerLoginType,
 };
 use crate::request_guards::state::SessionType;
 use crate::schema::entities::{Book, BookWithPublisherName, PostgresInt, ISBN};
@@ -66,8 +68,12 @@ async fn add_customer_info(conn: &DbConn, customer: &Option<Customer>, context: 
 }
 
 fn add_owner_tag(owner: &Option<Owner>, context: &mut Context) {
-    if let Some(_) = owner {
+    if let Some(owner) = owner {
         context.insert("owner_logged_in", &true);
+
+        if let OwnerType::OwnerAccount(_) = owner.owner {
+            context.insert("not_default_owner", &true)
+        };
     }
 }
 
@@ -191,10 +197,9 @@ pub async fn index(
 
     let books = get_books_with_publisher_name(&conn).await;
     if let Ok(books) = books {
-        let books = filter_books(books, search);
-
-        context.insert("books", &books);
         context.insert("genres", &extract_genre_list(&books));
+        let books = filter_books(books, search);
+        context.insert("books", &books);
 
         Template::render("index", context.into_json())
     } else {
@@ -1257,4 +1262,169 @@ pub async fn restock_order_page(conn: DbConn, owner: Owner) -> Template {
         }
         Err(e) => render_error_template(e.to_string(), &conn, &None).await,
     }
+}
+
+#[get("/collections")]
+pub async fn collections_page(conn: DbConn) -> Template {
+    let collections = match get_collections(&conn).await {
+        Ok(v) => v,
+        Err(e) => return render_error_template(e.to_string(), &conn, &None).await,
+    };
+
+    let mut context = Context::new();
+
+    context.insert("collections", &collections);
+    context.insert("num_collections", &collections.len());
+
+    Template::render("collections", context.into_json())
+}
+
+#[get("/owner/manage/collections")]
+pub async fn manage_collections_page(conn: DbConn, owner: Owner) -> Template {
+    let mut context = Context::new();
+
+    add_owner_tag(&Some(owner), &mut context);
+
+    let owner_id = match owner.owner {
+        OwnerType::DefaultOwner => {
+            return render_error_template("Default owner cannot curate collections.", &conn, &None)
+                .await
+        }
+        OwnerType::OwnerAccount(owner_id) => owner_id,
+    };
+
+    let owner_collections = match get_collections_curated_by_owner(&conn, owner_id).await {
+        Ok(v) => v,
+        Err(e) => return render_error_template(e.to_string(), &conn, &None).await,
+    };
+
+    context.insert("collections", &owner_collections);
+    context.insert("num_collections", &owner_collections.len());
+
+    Template::render("collections", context.into_json())
+}
+
+#[derive(FromForm)]
+pub struct AddCollection<'r> {
+    name: &'r str,
+}
+
+#[post("/owner/manage/collections/add", data = "<data>")]
+pub async fn add_collection_endpoint(
+    conn: DbConn,
+    owner: Owner,
+    data: Form<AddCollection<'_>>,
+) -> Template {
+    match owner.owner {
+        OwnerType::DefaultOwner => {
+            render_error_template("Default owner cannot curate collections", &conn, &None).await
+        }
+        OwnerType::OwnerAccount(owner_id) => {
+            match add_collection(&conn, owner_id, data.name).await {
+                Ok(_) => {
+                    let context = Context::new();
+                    Template::render("collection_create_success", context.into_json())
+                }
+                Err(e) => render_error_template(e.to_string(), &conn, &None).await,
+            }
+        }
+    }
+}
+
+#[derive(serde::Deserialize)]
+pub struct CollectionBooks {
+    collection_id: PostgresInt,
+    books: Vec<ISBN>,
+}
+
+#[put("/owner/manage/collections/books/add", data = "<collection_books>")]
+pub async fn add_books_to_collection_endpoint(
+    conn: DbConn,
+    owner: Owner,
+    collection_books: Json<CollectionBooks>,
+) -> Result<(), (Status, String)> {
+    match owner.owner {
+        OwnerType::DefaultOwner => Err((
+            Status::NotAcceptable,
+            "Default owner cannot curate collections".to_owned(),
+        )),
+        OwnerType::OwnerAccount(owner_id) => {
+            match is_owner_curator(&conn, owner_id, collection_books.collection_id).await {
+                Ok(v) => match v {
+                    true => add_books_to_collection(
+                        &conn,
+                        collection_books.collection_id,
+                        collection_books.books.clone(),
+                    )
+                    .await
+                    .map_err(|e| (Status::InternalServerError, e.to_string())),
+                    false => Err((
+                        Status::NotAcceptable,
+                        "You cannot edit another owner's collections".to_owned(),
+                    )),
+                },
+                Err(e) => Err((Status::InternalServerError, e.to_string())),
+            }
+        }
+    }
+}
+
+#[put("/owner/manage/collections/books/remove", data = "<collection_books>")]
+pub async fn remove_books_from_collection_endpoint(
+    conn: DbConn,
+    owner: Owner,
+    collection_books: Json<CollectionBooks>,
+) -> Result<(), (Status, String)> {
+    match owner.owner {
+        OwnerType::DefaultOwner => Err((
+            Status::NotAcceptable,
+            "Default owner cannot curate collections".to_owned(),
+        )),
+        OwnerType::OwnerAccount(owner_id) => {
+            match is_owner_curator(&conn, owner_id, collection_books.collection_id).await {
+                Ok(v) => match v {
+                    true => remove_books_from_collection(
+                        &conn,
+                        collection_books.collection_id,
+                        collection_books.books.clone(),
+                    )
+                    .await
+                    .map_err(|e| (Status::InternalServerError, e.to_string())),
+                    false => Err((
+                        Status::NotAcceptable,
+                        "You cannot edit another owner's collections".to_owned(),
+                    )),
+                },
+                Err(e) => Err((Status::InternalServerError, e.to_string())),
+            }
+        }
+    }
+}
+
+#[get("/collection/<collection_id>/search?<search>")]
+pub async fn view_collection(
+    conn: DbConn,
+    owner: Option<Owner>,
+    collection_id: PostgresInt,
+    search: Search<'_>,
+) -> Template {
+    let mut context = Context::new();
+    add_owner_tag(&owner, &mut context);
+
+    let books = match get_books_with_publisher_name(&conn).await {
+        Ok(v) => v,
+        Err(e) => return render_error_template(e.to_string(), &conn, &None).await,
+    };
+
+    let collection = match get_collection(&conn, collection_id).await {
+        Ok(v) => v,
+        Err(e) => return render_error_template(e.to_string(), &conn, &None).await,
+    };
+
+    context.insert("genres", &extract_genre_list(&books));
+    let books = filter_books(books, search);
+    context.insert("collection", &collection);
+    context.insert("books", &books);
+
+    Template::render("collection", context.into_json())
 }

@@ -64,6 +64,12 @@ fn rocket() -> _ {
                 error_page,
                 create_owner,
                 restock_order_page,
+                manage_collections_page,
+                add_collection_endpoint,
+                add_books_to_collection_endpoint,
+                remove_books_from_collection_endpoint,
+                view_collection,
+                collections_page,
             ],
         )
         .mount("/style", FileServer::from("style/"))

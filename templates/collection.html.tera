@@ -1,0 +1,182 @@
+{% extends "base" %}
+
+{% block head %}
+<link rel="stylesheet" href="/style/collection.css" />
+{% endblock head %}
+
+{% block content %}
+<h1>Collection: {{ collection.name }}</h1>
+<h2>Books In Collection</h2>
+
+<div class="books" id="books-removal">
+{% for book in collection.books %}
+{% if owner_logged_in and not_default_owner %}
+<div class="book-selectable">
+    <input type="checkbox" id="{{ book.isbn }}-checkbox" data-isbn="{{ book.isbn }}"></input>
+    <label for="{{ book.isbn }}-checkbox">
+    <image src="https://via.placeholder.com/180"></image>
+{% else %}
+<div class="book">
+    <a href="/book/{{ book.isbn }}">
+    <image src="https://via.placeholder.com/180"></image>
+    </a>
+{% endif %}
+    <h4>{{ book.title }}</h4>
+    <p>By: {{ book.author_name }}</p>
+    {% if book.discontinued == true %}
+    <p class="discontinued">Discontinued</p>
+    {% endif %}
+    </label>
+</div>
+{% endfor %}
+</div>
+
+{% if owner_logged_in and not_default_owner %}
+<script type="text/javascript">
+    function getSelectedBooksForRemoval() {
+        let books = document.getElementById("books-removal");
+
+        let bookCards = books.children;
+        let bookInputs = [...bookCards].map(card => card.children[0]);
+
+        let selectedBooks = bookInputs.map(bookInput => [bookInput.dataset.isbn, bookInput.checked]).filter(selectedBook => selectedBook[1] == true).map(selectedBook => parseInt(selectedBook[0]));
+
+        return selectedBooks;
+    }
+
+    function getSelectedBooksForAddition() {
+        let books = document.getElementById("books-addition");
+
+        let bookCards = books.children;
+        let bookInputs = [...bookCards].map(card => card.children[0]);
+
+        let selectedBooks = bookInputs.map(bookInput => [bookInput.dataset.isbn, bookInput.checked]).filter(selectedBook => selectedBook[1] == true).map(selectedBook => parseInt(selectedBook[0]));
+
+        return selectedBooks;
+    }
+
+    async function removeSelectedBooks() {
+        let selectedBooks = getSelectedBooksForRemoval();
+
+        await fetch(window.location.origin + '/owner/manage/collections/books/remove', {
+            method: 'PUT',
+            body: JSON.stringify(
+                {
+                    collection_id: {{ collection.collection_id }},
+                    books: selectedBooks,
+                }),
+        });
+
+        window.location.reload();
+    }
+
+    async function addSelectedBooks() {
+        let selectedBooks = getSelectedBooksForAddition();
+
+        await fetch(window.location.origin + '/owner/manage/collections/books/add', {
+            method: 'PUT',
+            body: JSON.stringify(
+                {
+                    collection_id: {{ collection.collection_id }},
+                    books: selectedBooks,
+                }),
+        });
+
+        window.location.reload();
+    }
+
+</script>
+
+<p>
+<button onclick="removeSelectedBooks()">Remove Books</button>
+<button onclick="addSelectedBooks()">Add Books</button>
+</p>
+
+<h2>Books</h2>
+
+<button onclick="
+                 let searchForm = document.getElementById('search-form');
+
+                 if (searchForm.style.display === 'none') {
+                    searchForm.style.display = 'block';
+                 } else {
+                    searchForm.style.display = 'none';
+                 }
+                 ">Show/Hide Search</button>
+
+<form action="/collection/{{ collection.collection_id }}/search" method="get" id="search-form">
+  <ul>
+    <li>
+        <label for="title">Title:</label>
+        <input type="text" id="title" name="search.title"></input>
+    </li>
+    <li>
+        <label for="ISBN">ISBN:</label>
+        <input type="text" id="isbn" name="search.isbn"></input>
+    </li>
+    <li>
+        <label for="genre">Genre:</label>
+        <select id="genre" name="search.genre">
+            <option value="N/A">N/A</option>
+            {% for genre in genres %}
+            <option value="{{ genre }}">{{genre}}</option>
+            {% endfor %}
+        </select>
+    </li>
+    <li>
+        <label for="author">Author:</label>
+        <input type="text" id="author" name="search.author"></input>
+    </li>
+    <li>
+        <label for="publisher">Publisher:</label>
+        <input type="text" id="publisher" name="search.publisher"></input>
+    </li>
+    <li>
+        <label for="min-pages">Min Length (Pages):</label>
+        <input type="number" id="min-pages" name="search.min_pages" min="0"></input>
+    </li>
+    <li>
+        <label for="max-pages">Max Length (Pages):</label>
+        <input type="number" id="max-pages" name="search.max_pages" min="0"></input>
+    </li>
+    <li>
+        <label for="min-price">Min Price:</label>
+        <input type="number" id="min-price" name="search.min_price" min="0"></input>
+    </li>
+    <li>
+        <label for="max-price">Max Price:</label>
+        <input type="number" id="max-price" name="search.max_price" min="0"></input>
+    </li>
+    <li>
+        <label for="show-discontinued">Show Discontinued:</label>
+        <input type="checkbox" id="show-discontinued" name="search.show_discontinued"></input>
+    </li>
+    <li>
+        <label for="show-no-stock">Show Out of Stock:</label>
+        <input type="checkbox" id="show-no-stock" name="search.show_no_stock"></input>
+    </li>
+    <li>
+      <button type="submit">Search</button>
+    </li>
+  </ul>
+</form>
+
+<div class="books" id="books-addition">
+{% for book in books %}
+<div class="book-selectable">
+    <input type="checkbox" id="{{ book.isbn }}-checkbox" data-isbn="{{ book.isbn }}"></input>
+    <label for="{{ book.isbn }}-checkbox">
+    <image src="https://via.placeholder.com/180"></image>
+    <h4>{{ book.title }}</h4>
+    <p>By: {{ book.author_name }}</p>
+    {% if book.discontinued == true %}
+    <p class="discontinued">Discontinued</p>
+    {% endif %}
+    </label>
+</div>
+{% endfor %}
+</div>
+
+{% endif %}
+
+{% endblock content %}

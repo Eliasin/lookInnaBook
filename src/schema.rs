@@ -223,6 +223,15 @@ pub mod entities {
             })
         }
     }
+
+    #[derive(Serialize, Clone, Debug)]
+    pub struct Collection {
+        pub collection_id: PostgresInt,
+        pub name: String,
+        pub curator_id: PostgresInt,
+        pub curator_name: String,
+        pub books: Vec<Book>,
+    }
 }
 
 pub mod joined {
