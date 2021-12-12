@@ -11,6 +11,7 @@
 {% endif %}
 
 <p>Title: {{ book.title }}</p>
+<p>ISBN: {{ book.isbn }}</p>
 <p>Author: {{ book.author_name }}</p>
 <p>Genre: {{ book.genre }}</p>
 <p>Pages: {{ book.num_pages }}</p>

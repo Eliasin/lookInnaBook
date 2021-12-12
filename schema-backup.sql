@@ -112,7 +112,7 @@ ALTER TABLE base.book_collection ALTER COLUMN collection_id ADD GENERATED ALWAYS
 CREATE TABLE base.customer (
     customer_id integer NOT NULL,
     name character varying(20),
-    email character varying(20),
+    email character varying(50),
     password_hash character(60),
     default_shipping_address integer,
     default_payment_info_id integer
@@ -403,10 +403,10 @@ COPY base.address (address_id, street_address, postal_code, province) FROM stdin
 
 COPY base.book (isbn, author_name, genre, publisher_id, num_pages, price, author_royalties, reorder_threshold, title, stock, discontinued) FROM stdin;
 82381902	B. Kenny	Sci-Fi	2	300	29.99	0.10	10	Jarjar Journeys	29	f
-312321	John Shefman	Cooking	4	25	50.00	0.10	5	Food For People Who Eat	7	f
 82381967	B. Kenny	Sci-Fi	2	300	29.99	0.10	10	Jarjar Journeys 2	24	f
-7318293	Ian Stoop	Self-Improvement	3	3	99.00	0.50	2	How to Not be a Loser (For Losers)	5	f
-82381990	B. Kenny	Sci-Fi	2	300	29.99	0.10	10	Jarjar Journeys 3: Jarjar Redux Complete	2	f
+312321	John Shefman	Cooking	4	25	50.00	0.10	5	Food For People Who Eat	20	f
+7318293	Ian Stoop	Self-Improvement	3	3	99.00	0.50	2	How to Not be a Loser (For Losers)	20	f
+82381990	B. Kenny	Sci-Fi	2	300	29.99	0.10	10	Jarjar Journeys 3: Jarjar Redux Complete	20	f
 \.
 
 
