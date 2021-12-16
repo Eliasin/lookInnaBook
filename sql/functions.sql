@@ -1,3 +1,5 @@
+-- Creates restock order for books if change to book stock lowers book below threshold and there
+-- is not already a restock order placed that is pending
 CREATE OR REPLACE FUNCTION public.restock_book_trigger()
  RETURNS trigger
  LANGUAGE plpgsql

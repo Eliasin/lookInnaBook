@@ -1,5 +1,6 @@
 /target
 /docs/.auctex-auto/
+*.out
 *.pdf
 *.aux
 *.log

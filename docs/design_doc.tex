@@ -6,6 +6,7 @@
 \usepackage{textcomp}
 \usepackage{underscore}
 \usepackage{listofitems}
+\usepackage{hyperref}
 \graphicspath{./}
 
 \newcommand{\schema}[2]{#1(#2)}
@@ -27,6 +28,26 @@
 
 \begin{document}
 \maketitle
+
+\section{Foreword}
+I decided to make my implementation as a full webserver/website implementation (which I regret a little) and used Rust as my implementation language for its emphasis on correctness and its powerful type system (which eases a lot of concerns with the loosely typed nature of the web).
+
+The github for the project is \href{https://github.com/Eliasin/lookInnaBook}{here} (https://github.com/Eliasin/lookInnaBook). I have also deployed it to a DigitalOcean droplet for you to try out \href{http://owncloud.eliasin.ca:8000/}{here} (http://owncloud.eliasin.ca:8000/).
+
+You can create your own account on the deployment or use one that I've used for testing, its credentials are ``test2@local'' as the email and ``123'' as the password. Similarly, an admin account I've used for testing has the credentials ``admin2@local'' and ``123''.
+
+Some notable extra features are:
+\begin{itemize}
+  \item Password hashing and salting using the bcrypt algorithm for all logins (customers and owners)
+  \item Encrypted cookies
+  \item Type level access proofs (type level proofs that only owners can delete accounts, etc.) more details \href{https://rocket.rs/v0.4/guide/requests/#custom-guards}{here}.
+  \item High performance and scalability courtesy of the Rust language
+  \item Trivial usage by multiple users at the same time due to the web server nature and Rust's concurrency guaranteees
+  \item Easy deployments to single nodes courtesy of the Rust toolchain
+  \item Minimal use of javascript/client-side rendering for high performance and accessibility out of the box achieved through use of SSR and HTML templates
+  \item String similarity search with titles using the sorensen dice algortithm provided by the strsim Rust crate
+\end{itemize}
+
 \section{ER Diagram}
 The ER diagram is shown on the next page in landscape format.
 Some assumptions made are:
@@ -36,6 +57,12 @@ Some assumptions made are:
   \item Each order can only ship to one address
   \item Each book can be uniquely identified by an ISBN
   \item A credit card number does not uniquely identify a method of payment (I did some cursory research and apparently sometimes these are reused with different CVV numbers)
+  \item A publisher's payment information can be summed up in a bank number
+  \item A book collection can only be curated by one owner at a time
+  \item A book's data can never be completely removed from the database as this would mess with previous order information, instead, books are discontinued which prevents purchasing and hides them from the store
+  \item If no owner accounts exist, an owner can be bootstrapped by logging into a default owner account with credentials ``admin@local'' and ``123''. This default owner account cannot curate collections and is disabled when another account is created.
+  \item All orders and restock orders have the ability database-wise to be set to whatever the state of the order is, but we have no outside triggers to change these so they will always be stuck as PENDING or PR (processing)
+  \item The restock orders will order the previous month's sales including the sale that triggered the restock
 \end{itemize}
 
 \begin{landscape}
@@ -45,35 +72,35 @@ Some assumptions made are:
 \section{Relations Schema}
 The above ER diagram can be broken down into the relation schema below. Primary keys are denoted by underscores. Foreign keys are denoted in italics.
 \begin{itemize}
-  \item \schema{book}{\pkey{isbn}, title, author_name, genre, publisher, num_pages, price, author_royalties, reorder_threshold, \fkey{publisher_id}}
+  \item \schema{book}{\pkey{isbn}, title, author_name, genre, publisher, num_pages, price, author_royalties, reorder_threshold, stock, discontinued, \fkey{publisher_id}}
   \item \schema{address}{\pkey{address_id}, street_address, postal_code, province}
   \item \schema{customer}{\pkey{customer_id}, name, email, password_hash, password_salt, \fkey{default_shipping_address_id, default_payment_info_id}}
   \item \schema{payment_info}{\pkey{payment_info_id}, name_on_card, expiry, card_number, cvv, \fkey{billing_address}}
-  \item \schema{publisher}{\pkey{publisher_id}, company_name, phone_number, bank_information, \fkey{address_id}}
+  \item \schema{publisher}{\pkey{publisher_id}, company_name, phone_number, bank_number, \fkey{address_id}}
   \item \schema{order}{\pkey{order_id}, \fkey{customer_id, shipping_address}, tracking_number, order_status, order_date, \fkey{payment_info_id}}
   \item \schema{in_order}{\fkey{\pkey{isbn, order_id}}, quantity}
   \item \schema{restock_order}{\pkey{restock_order_id}, \fkey{isbn}, quantity, price_per_unit, order_date, order_status}
   \item \schema{in_cart}{\fkey{\pkey{isbn, customer_id}}, quantity}
   \item \schema{owner}{\pkey{owner_id}, name, email, password_hash, password_salt}
-  \item \schema{book_collection}{\pkey{collection_id}, \fkey{curator_owner_id}}
+  \item \schema{book_collection}{\pkey{collection_id}, \fkey{curator_owner_id}, name}
   \item \schema{in_collection}{\fkey{\pkey{collection_id, isbn}}}
 \end{itemize}
 
 \section{Functional Dependencies}
 Below are the functional dependencies for this domain.
 \begin{itemize}
-  \item ISBN \trightarrow{} Title, AuthorName, Genre, Publisher, NumPages, Price, AuthorRoyalties, ReorderThreshold
+  \item ISBN \trightarrow{} Title, AuthorName, Genre, Publisher, NumPages, Price, AuthorRoyalties, ReorderThreshold, Stock, Discontinued
   \item AddressID \trightarrow{} StreetAddress, PostalCode, Province
   \item CustomerID \trightarrow{} CustomerName, CustomerEmail, CustomerPasswordHash, CustomerPasswordSalt, DefaultShippingAddressID, DefaultPaymentInfoID
   \item Email \trightarrow{} CustomerID, CustomerName, CustomerPasswordHash, CustomerPasswordSalt, DefaultShippingAddressID, DefaultPaymentInfoID
   \item PaymentInfoID \trightarrow{} NameOnCard, ExpiryDate, CardNumber, CVV, BillingAddressID
-  \item PublisherID \trightarrow{} CompanyName, PhoneNumber, BankInformation, AddressID
+  \item PublisherID \trightarrow{} CompanyName, PhoneNumber, BankNumber, AddressID
   \item OrderID \trightarrow{} CustomerID, TrackingNum, OrderStatus, OrderDate, ShippingAddressID, PaymentInfoID
   \item OrderID, BookISBN \trightarrow{} OrderQuantity
   \item CustomerID, BookISBN \trightarrow{} CartQuantity
   \item RestockOrderID \trightarrow{} BookISBN, Quantity, PricePerUnit, OrderDate, OrderStatus
   \item OwnerID \trightarrow{} OwnerName, OwnerEmail, OwnerPasswordHash, OwnerPasswordSalt
-  \item BookCollectionID \trightarrow{} OwnerID
+  \item BookCollectionID \trightarrow{} OwnerID, Name
 \end{itemize}
 
 \section{Testing For Good Form}
@@ -122,6 +149,14 @@ Functional dependencies:
 (CustomerID, BookISBN) is trivially the super key since it determines the other attribute in the relation.
 
 All of our relations are in good form.
+
+\section{Schema Diagram}
+
+\begin{landscape}
+\includegraphics[height=\textwidth]{schema}
+\end{landscape}
+
+\section{Implementation}
 
 
 \end{document}
