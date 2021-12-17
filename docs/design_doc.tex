@@ -24,7 +24,7 @@
 \newcommand{\trightarrow}{\(\rightarrow\)}
 
 \title{COMP3005 Project Design Document}
-\author{Steven Pham}
+\author{Steven Pham (101 104 297)}
 
 \begin{document}
 \maketitle
@@ -36,17 +36,7 @@ The github for the project is \href{https://github.com/Eliasin/lookInnaBook}{her
 
 You can create your own account on the deployment or use one that I've used for testing, its credentials are ``test2@local'' as the email and ``123'' as the password. Similarly, an admin account I've used for testing has the credentials ``admin2@local'' and ``123''.
 
-Some notable extra features are:
-\begin{itemize}
-  \item Password hashing and salting using the bcrypt algorithm for all logins (customers and owners)
-  \item Encrypted cookies
-  \item Type level access proofs (type level proofs that only owners can delete accounts, etc.) more details \href{https://rocket.rs/v0.4/guide/requests/#custom-guards}{here}.
-  \item High performance and scalability courtesy of the Rust language
-  \item Trivial usage by multiple users at the same time due to the web server nature and Rust's concurrency guaranteees
-  \item Easy deployments to single nodes courtesy of the Rust toolchain
-  \item Minimal use of javascript/client-side rendering for high performance and accessibility out of the box achieved through use of SSR and HTML templates
-  \item String similarity search with titles using the sorensen dice algortithm provided by the strsim Rust crate
-\end{itemize}
+A funny thing that happened is that I ended up finding a bug in the open source plotting library \href{https://lib.rs/crates/poloto}{poloto} where it would not escape ampersands and other HTML characters in the generated SVGs (would break when a publisher had \& in its name).
 
 \section{ER Diagram}
 The ER diagram is shown on the next page in landscape format.
@@ -157,6 +147,97 @@ All of our relations are in good form.
 \end{landscape}
 
 \section{Implementation}
+The general architecture of the application is divided at the file level. The main.rs file mostly does some library setup, the endpoint.rs file defines all of the HTTP endpoints the application exposes, the db.rs file exposes operations and queries on the database that are used by the endpoints, the schema.rs file exposes structures that represent database entities.
 
+Below I will go over a select number of use cases in terms of control flow.
+
+Loading site main page:
+\begin{enumerate}
+  \item Client makes HTTP request to server for index
+  \item Server matches path to registered routes (defined in main.rs)
+  \item Matching path is found (paths are defined in endpoints.rs)
+  \item Index path determines whether or not user is logged in by checking cookies for session tokens
+  \item If the user is logged in, it adds information to the HTML rendering context to among other things, display the correct nav bar links (if logged in, no log in link, for example)
+  \item Endpoint makes DB query to get all books (no pagination implemented) to populate the main page
+  \item Book information is placed in the HTML rendering context
+  \item HTML template (index.html.tera under templates/) is rendered
+  \item HTTP response is sent to user
+\end{enumerate}
+
+Logging in as a customer (note that I did not implement HTTPS so passwords are not encrypted by default):
+\begin{enumerate}
+  \item Client submits HTML form to log in
+  \item Server gets the login information for a given email if it exists
+  \item Server checks if the password field of the form hashes to the correct bcrypt hash
+  \item If password is correct, a session cookie is added to running memory corresponding to the user and we set the user cookie to the session token
+\end{enumerate}
+
+A user tries to login to a page they are not authorized to view:
+\begin{enumerate}
+  \item Client tries to forge HTTP request to edit/view data
+  \item Rocket tries to create Owner type as a request guard to verify that the request comes from someone with owner permissions (implementation is in request_guard.rs)
+  \item Request guard looks for owner session token in HTTP request
+  \item Implementation does not find one or finds forged token
+  \item Token does not correspond to logged in owner, request is denied with 403 HTTP response
+\end{enumerate}
+
+A user tries to use default admin session token when owner accounts exist:
+\begin{enumerate}
+  \item Client tries to view owner protected content
+  \item Owner request guard implementation is triggered
+  \item Request guard checks if session token exists
+  \item Owner session token is identified, we check if any non default owner session tokens exist
+  \item If they do not, we now check if there are any owners registered in the database
+  \item Owners exist in database, default owner session token is removed and access is denied with 403 HTTP response
+\end{enumerate}
+
+A diagram showing the low level control flow of the application is below.
+
+\begin{landscape}
+\includegraphics[height=\textwidth]{implementation}
+\end{landscape}
+
+Here are some screenshots of the UI (I use a dark-mode browser plugin so it will look different to you.)
+
+\begin{center}
+  Home Screen
+  \includegraphics[width=\textwidth]{home_screen}
+  Reports
+  \includegraphics[width=\textwidth]{reports}
+  Manage Books
+  \includegraphics[width=\textwidth]{manage_books}
+  Order Details
+  \includegraphics[width=\textwidth]{order}
+  Orders
+  \includegraphics[width=\textwidth]{orders}
+  Cart
+  \includegraphics[width=\textwidth]{cart}
+  Checkout
+  \includegraphics[width=\textwidth]{checkout}
+  Create Book
+  \includegraphics[width=\textwidth]{create_books}
+\end{center}
+
+
+\section{Bonus Features}
+Some notable extra features are:
+\begin{itemize}
+  \item Password hashing and salting using the bcrypt algorithm for all logins (customers and owners)
+  \item Encrypted cookies
+  \item Type level access proofs (type level proofs that only owners can delete accounts, etc.) more details \href{https://rocket.rs/v0.4/guide/requests/#custom-guards}{here}.
+  \item High performance and scalability courtesy of the Rust language
+  \item Trivial usage by multiple users at the same time due to the web server nature and Rust's concurrency guaranteees
+  \item Easy deployments to single nodes courtesy of the Rust toolchain
+  \item Minimal use of javascript/client-side rendering for high performance and accessibility out of the box achieved through use of SSR and HTML templates
+  \item String similarity search with titles using the sorensen dice algortithm provided by the strsim Rust crate
+  \item Curated book collections by owners
+\end{itemize}
+
+
+\section{Github Repository}
+The github for the project is \href{https://github.com/Eliasin/lookInnaBook}{here} (https://github.com/Eliasin/lookInnaBook). I have also deployed it to a DigitalOcean droplet for you to try out \href{http://owncloud.eliasin.ca:8000/}{here} (http://owncloud.eliasin.ca:8000/). (Note while creating accounts that while passwords are not stored because of the hashing, the site does not implement HTTPS and therefore passwords are sent across the internet unencrypted.)
+
+\section{Appendix}
+I am available at any time on the 20th though preferably later in the day.
 
 \end{document}
