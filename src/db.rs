@@ -1238,7 +1238,7 @@ pub mod query {
     ) -> Result<(), postgres::error::Error> {
         conn.run(move |c| {
             c.execute(
-                "DELETE FROM base.customer WHERE customer_id = $1;",
+                "DELETE FROM base.customer WHERE customer_id = $1 ON DELETE CASCADE;",
                 &[&customer_id],
             )
         })
@@ -1251,8 +1251,13 @@ pub mod query {
         conn: &DbConn,
         owner_id: PostgresInt,
     ) -> Result<(), postgres::error::Error> {
-        conn.run(move |c| c.execute("DELETE FROM base.owner WHERE owner_id = $1;", &[&owner_id]))
-            .await?;
+        conn.run(move |c| {
+            c.execute(
+                "DELETE FROM base.owner WHERE owner_id = $1 ON DELETE CASCADE;",
+                &[&owner_id],
+            )
+        })
+        .await?;
 
         Ok(())
     }
