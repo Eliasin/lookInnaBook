@@ -16,7 +16,7 @@ use crate::db::query::{
     Expiry, OwnerLoginType,
 };
 use crate::request_guards::state::SessionType;
-use crate::schema::entities::{Book, BookWithPublisherName, PostgresInt, ISBN};
+use crate::schema::entities::{Book, BookWithPublisherName, PostgresInt, Publisher, ISBN};
 use crate::schema::joined::Order;
 use crate::schema::no_id::{Address, PaymentInfo};
 use crate::schema::{self, no_id};
@@ -985,6 +985,15 @@ pub async fn sales_report_image_publishers(conn: DbConn, _owner: Owner) -> (Cont
         Ok(v) => v,
         Err(_) => vec![],
     };
+
+    // Escape special characters
+    let publishers: Vec<Publisher> = publishers
+        .into_iter()
+        .map(|publisher| Publisher {
+            company_name: publisher.company_name.replace("&", "&amp;"),
+            ..publisher
+        })
+        .collect();
 
     let mut sales_data: Vec<(String, SalesPerDay)> =
         vec![("Total Sales".to_string(), sales_by_date)];
