@@ -13,5 +13,15 @@
 
 <p>Name: {{ customer.name }}</p>
 <p>Email: {{ customer.email }}</p>
+<h2>Shipping Information</h2>
+<p>Address: {{ customer.street_address }}</p>
+<p>Postal Code: {{ customer.postal_code }}</p>
+<p>Province: {{ customer.province }}</p>
+<h2>Billing Information</h2>
+<p>Name on Card: {{ customer.name_on_card }}</p>
+<p>Address: {{ customer.billing_street_address }}</p>
+<p>Postal Code: {{ customer.billing_postal_code }}</p>
+<p>Province: {{ customer.billing_province }}</p>
+
 
 {% endblock content %}
