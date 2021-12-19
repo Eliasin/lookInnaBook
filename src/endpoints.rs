@@ -37,6 +37,9 @@ use strsim::sorensen_dice;
 
 use crate::{request_guards::*, SessionTokenState};
 
+///! A collection of the HTTP endpoints for the entire application
+
+/// A helper function to render a template showing a simple error message and a back button
 async fn render_error_template<T: AsRef<str>>(
     error: T,
     conn: &DbConn,
@@ -51,6 +54,8 @@ async fn render_error_template<T: AsRef<str>>(
     Template::render("error", context.into_json())
 }
 
+/// A helper function that adds information about a customer into the rendering context
+/// of a Tera template if the customer exists.
 async fn add_customer_info(conn: &DbConn, customer: &Option<Customer>, context: &mut Context) {
     if let Some(customer) = customer {
         if let Ok(customer_info) = get_customer_info(&conn, customer.customer_id).await {
@@ -67,6 +72,7 @@ async fn add_customer_info(conn: &DbConn, customer: &Option<Customer>, context: 
     }
 }
 
+/// A helper function that tells the Tera template that an owner is logged in.
 fn add_owner_tag(owner: &Option<Owner>, context: &mut Context) {
     if let Some(owner) = owner {
         context.insert("owner_logged_in", &true);
@@ -77,10 +83,12 @@ fn add_owner_tag(owner: &Option<Owner>, context: &mut Context) {
     }
 }
 
+/// A helper function that extracts all the genres from a list of books
 fn extract_genre_list(books: &Vec<BookWithPublisherName>) -> HashSet<String> {
     books.iter().map(|book| book.genre.clone()).collect()
 }
 
+/// Search represents an HTML form or set of url query strings for the book search bar.
 #[derive(FromForm, Debug)]
 pub struct Search<'r> {
     title: Option<&'r str>,
@@ -96,6 +104,8 @@ pub struct Search<'r> {
     show_no_stock: Option<bool>,
 }
 
+/// A helper function that filters a list of books based on a search request.
+/// Titles are not searched by equality but instead use string similarity.
 fn filter_books(
     books: Vec<BookWithPublisherName>,
     search: Search<'_>,
@@ -184,6 +194,8 @@ fn filter_books(
     books
 }
 
+/// This is the route for the root of the website.
+/// Book searches are implemented as query parameters.
 #[get("/?<search>")]
 pub async fn index(
     conn: DbConn,
@@ -212,28 +224,33 @@ pub async fn index(
     }
 }
 
+/// This route is for the customer login page.
 #[get("/login")]
 pub async fn login_page() -> Template {
     let context = HashMap::<&str, &str>::new();
     Template::render("login", &context)
 }
 
+/// This route is the login failed message.
 #[get("/login/failed/<e>")]
 pub async fn login_failed(e: &str, conn: DbConn) -> Template {
     render_error_template(format!("Login failed: {}", e), &conn, &None).await
 }
 
+/// This route is the customer registration page.
 #[get("/register")]
 pub async fn register_page() -> Template {
     let context = HashMap::<&str, &str>::new();
     Template::render("registration", &context)
 }
 
+/// This route is the customer registration failed message.
 #[get("/register/failed/<reason>")]
 pub async fn register_failed(reason: &str, conn: DbConn) -> Template {
     render_error_template(format!("Registration failed: {}", reason), &conn, &None).await
 }
 
+/// This route shows very basic customer information.
 #[get("/customer")]
 pub async fn customer_page(cust: Customer, conn: DbConn) -> Template {
     let mut context = Context::new();
@@ -254,18 +271,14 @@ pub async fn customer_page(cust: Customer, conn: DbConn) -> Template {
     Template::render("customer", context.into_json())
 }
 
-#[get("/owner")]
-pub async fn owner_page() -> Template {
-    let context = HashMap::<&str, &str>::new();
-    Template::render("owner", &context)
-}
-
+/// The Login struct represents the HTML form query for a customer login.
 #[derive(FromForm)]
 pub struct Login<'r> {
     email: &'r str,
     password: &'r str,
 }
 
+/// This helper function creates a random session token.
 fn create_session_token() -> String {
     let mut rng = rand_chacha::ChaCha12Rng::from_entropy();
     let mut token: [u8; 32] = [0; 32];
@@ -276,6 +289,7 @@ fn create_session_token() -> String {
     token
 }
 
+/// This route handles login form requests.
 #[post("/login", data = "<login_data>")]
 pub async fn login(
     conn: DbConn,
@@ -302,6 +316,7 @@ pub async fn login(
     }
 }
 
+/// The Register struct represents the HTML form query for a customer registration.
 #[derive(FromForm)]
 pub struct Register<'r> {
     email: &'r str,
@@ -319,6 +334,7 @@ pub struct Register<'r> {
     billing_province: &'r str,
 }
 
+/// This route handles login form requests.
 #[post("/register", data = "<register_data>")]
 pub async fn register(conn: DbConn, register_data: Form<Register<'_>>) -> Redirect {
     let Register {
@@ -362,6 +378,7 @@ pub async fn register(conn: DbConn, register_data: Form<Register<'_>>) -> Redire
     }
 }
 
+/// This route shows basic details about individual books.
 #[get("/book/<isbn>")]
 pub async fn book(
     conn: DbConn,
@@ -404,6 +421,10 @@ pub async fn book(
     }
 }
 
+/// This route is the customer cart page.
+///
+/// This page allows customers to view all of the books in the cart,
+/// adjust book quantities and proceed to checkout.
 #[get("/customer/cart")]
 pub async fn customer_cart_page(conn: DbConn, customer: Option<Customer>) -> Template {
     let mut context = Context::new();
@@ -460,6 +481,7 @@ pub async fn customer_cart_page(conn: DbConn, customer: Option<Customer>) -> Tem
     }
 }
 
+/// This route handles book additions to the cart.
 #[put("/customer/cart/add/<isbn>")]
 pub async fn customer_cart_add(conn: DbConn, customer: Customer, isbn: ISBN) -> Status {
     match add_to_cart(&conn, customer.customer_id, isbn).await {
@@ -468,6 +490,8 @@ pub async fn customer_cart_add(conn: DbConn, customer: Customer, isbn: ISBN) -> 
     }
 }
 
+/// This route handles quantity changes to books in the cart.
+/// If the quantity is 0, the book is removed.
 #[put("/customer/cart/quantity/<isbn>/<quantity>")]
 pub async fn customer_cart_set_quantity(
     conn: DbConn,

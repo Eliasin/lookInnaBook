@@ -30,7 +30,6 @@ fn rocket() -> _ {
                 login_page,
                 login_failed,
                 customer_page,
-                owner_page,
                 register,
                 register_page,
                 register_failed,
